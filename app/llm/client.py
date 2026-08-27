@@ -16,7 +16,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# gpt-oss is a reasoning model: its internal "thinking" tokens are billed
+# against max_tokens before the visible answer, and it will happily spend
+# the entire budget thinking and return an empty completion (finish_reason
+# "length") if you don't rein it in. reasoning_effort="low" is enough for
+# a five-way classification or a three-sentence email -- there's no
+# multi-step problem here that needs a deeper budget.
+REASONING_EFFORT = "low"
 
 
 def is_configured() -> bool:
@@ -52,13 +60,14 @@ def chat_json(
             temperature=temperature,
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
+            extra_body={"reasoning_effort": REASONING_EFFORT},
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
         )
         content = response.choices[0].message.content
-        return json.loads(content)
+        return json.loads(content) if content else None
     except Exception:
         return None
 
@@ -79,11 +88,13 @@ def chat_text(
             model=model or DEFAULT_MODEL,
             temperature=temperature,
             max_tokens=max_tokens,
+            extra_body={"reasoning_effort": REASONING_EFFORT},
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else None
     except Exception:
         return None
