@@ -1,0 +1,10 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.venv": true,
+      "**/data/simulation.json": true
+    }
+  }
+}
