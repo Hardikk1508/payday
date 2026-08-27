@@ -37,11 +37,12 @@ def summarise(results: List[ChargeResult], label: str) -> Dict[str, Any]:
 
     daily = []
     running = 0
+    running_count = 0
     for day in range(HORIZON_DAYS + 1):
-        running += sum(
-            r.amount for r in results if r.recovered and r.recovered_day == day
-        )
-        daily.append({"day": day, "recovered": running})
+        landed = [r for r in results if r.recovered and r.recovered_day == day]
+        running += sum(r.amount for r in landed)
+        running_count += len(landed)
+        daily.append({"day": day, "recovered": running, "recovered_count": running_count})
 
     return {
         "label": label,

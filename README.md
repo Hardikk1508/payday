@@ -36,32 +36,38 @@ reduces to waiting until the money exists.
 ## Result on a 5,000-subscriber cohort
 
 ```
-345 failed charges   Rs 707,155 at risk   30-day horizon
+321 failed charges   Rs 738,679 at risk   30-day horizon
 
                                       baseline        payday
 --------------------------------------------------------------
-recovered                           Rs 321,834    Rs 534,733
-recovery rate                            48.1%         77.4%
-retries spent                              804           432
-customer contacts                          251           209
+recovered                           Rs 394,838    Rs 541,259
+recovery rate                            50.5%         75.1%
+retries spent                              722           418
+customer contacts                          220           178
 
-delta  Rs 212,899   lift  +66.2%   retries saved  372
+delta  Rs 146,421   lift  +37.1%   retries saved  304
 
 by failure reason
 --------------------------------------------------------------
                           baseline    payday           at risk
-Insufficient funds           52.5%     78.3%        Rs 249,880
-Card expired                  6.9%     73.6%        Rs 175,428
-Do not honor                 39.7%     53.4%        Rs 108,942
-3DS / auth timeout           68.8%     97.9%         Rs 90,952
-Network error                89.4%     89.4%         Rs 81,953
+Insufficient funds           55.6%     66.7%        Rs 224,401
+Card expired                  6.1%     84.8%        Rs 133,434
+Do not honor                 45.8%     50.0%        Rs 166,428
+3DS / auth timeout           76.6%     97.9%        Rs 113,953
+Network error                91.9%    100.0%        Rs 100,463
 ```
 
-Payday recovers 66% more revenue using **46% fewer retry attempts** and fewer
-customer contacts. Network errors come out identical on both sides, which is
-the expected result -- when the correct move is "retry immediately" and the
-baseline happens to retry soon, there is nothing to gain. A model that showed
-Payday winning every category would be a model with its thumb on the scale.
+Payday recovers 37% more revenue using **42% fewer retry attempts** and fewer
+customer contacts. Card expired is the clearest case: retries alone recover
+6% of it because an expired card cannot clear, no matter how many times you
+try; routing straight to a card-update request recovers 85%. A model that
+showed Payday winning every category by a similar margin would be a model
+with its thumb on the scale -- network error, where the right move is
+"retry immediately" and the baseline already does that on day 1, is the
+category with the least room to improve.
+
+Regenerate this table any time with `python -m app.simulator.compare` --
+every number above is reproducible from seed 42, not hand-picked.
 
 ## Why the comparison is honest
 
@@ -84,9 +90,15 @@ Three properties make this a fair test rather than a demo:
 ## Architecture
 
 ```
-failed charge -> diagnose -> decide -> act -> outcome ledger
-                     ^                              |
-                     +------- reweights ------------+
+              5,000-customer comparison (deterministic, reproducible)
+failed charge --------> decide --------> act --------> outcome
+              (failure_code            (guardrails    (seeded per
+               already known,           applied to     charge/day/
+               see note below)          both sides)     action)
+
+              live, additive, not part of the scored comparison
+raw decline text ---> diagnose (LLM) ---> Payday's plan for that family
+action + reason  ---> outreach copy (LLM) ---> customer-facing message
 ```
 
 | Layer | Where | What it holds |
@@ -98,6 +110,20 @@ failed charge -> diagnose -> decide -> act -> outcome ledger
 | Guardrails | `app/policy/guardrails.py` | Retry, contact and spend caps |
 | Engine | `app/simulator/engine.py` | Executes any policy day by day |
 | Comparison | `app/simulator/compare.py` | Produces the headline number |
+| Diagnosis | `app/llm/diagnose.py` | Classifies a raw decline string via Groq, keyword heuristic if no key is set |
+| Outreach copy | `app/llm/outreach.py` | Generates the customer-facing message for an outreach/card-update action |
+
+**Why the diagnose/outreach LLM calls are kept out of the 5,000-customer
+loop:** that comparison has to stay deterministic -- same seed, same
+numbers, every run -- and a live model call per charge would make it
+neither reproducible nor fast (minutes instead of milliseconds for 300+
+charges). So `FailedCharge.failure_code` in the simulated cohort is known
+upfront, the way it would be *after* diagnosis. The `/diagnose` and
+`/outreach-copy` endpoints are the real, callable version of that step,
+exercised on demand against arbitrary input instead of baked into the bulk
+run. There's no persistent decision ledger or reweighting loop yet -- the
+`requirements.txt` entries for Mongo/Redis are staged for that, not wired
+up.
 
 ## Running it
 
@@ -105,17 +131,23 @@ failed charge -> diagnose -> decide -> act -> outcome ledger
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
+cp .env.example .env
+# fill in GROQ_API_KEY to get live LLM diagnosis/outreach copy; leave it
+# blank and both features fall back to a deterministic heuristic/template
+# instead of failing
+
 # print the comparison
 python -m app.simulator.compare
 
-# write data/simulation.json for the dashboard
+# write data/simulation.json (currently unused by the frontend, which
+# talks to the live API instead -- kept for offline/static demo use)
 python -m scripts.run_comparison --customers 5000 --seed 42
 
 # serve the API
 uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend:
+Frontend (needs the API running on :8000 -- the dev server proxies `/api` to it):
 
 ```bash
 cd frontend
@@ -127,10 +159,13 @@ npm run dev
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness |
+| GET | `/health` | Liveness, and whether an LLM key is configured |
 | GET | `/failure-codes` | The taxonomy and what each code means |
 | GET | `/simulate` | Full comparison, both policies |
 | GET | `/decisions` | Per-charge audit trail with reasons |
+| POST | `/diagnose` | Classify a raw decline string (live LLM call) |
+| GET | `/diagnose/examples` | Sample raw decline strings for the demo UI |
+| GET | `/outreach-copy` | Generate the customer-facing message for one logged action |
 
 ## Scope
 
