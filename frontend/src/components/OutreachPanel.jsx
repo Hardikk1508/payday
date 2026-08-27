@@ -140,7 +140,7 @@ export default function OutreachPanel() {
   }, []);
 
   return (
-    <div style={{ background: INK, borderTop: `1px solid ${LINE}` }}>
+    <div id="outreach" style={{ background: INK, borderTop: `1px solid ${LINE}`, scrollMarginTop: 16 }}>
       <style>{`
         .think-dot {
           width: 5px; height: 5px; border-radius: 50%; background: ${VIOLET};

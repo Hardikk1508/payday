@@ -16,11 +16,12 @@ function ExampleChip({ text, onClick }) {
       onClick={() => onClick(text)}
       className="ctl chip"
       style={{
-        background: "transparent", border: `1px solid ${LINE}`, color: MUTE,
-        fontSize: 11, padding: "5px 10px", cursor: "pointer", textAlign: "left",
-        fontFamily: FONT_MONO,
+        background: PANEL, border: `1px solid ${LINE}`, color: TEXT,
+        fontSize: 11, padding: "6px 12px 6px 10px", cursor: "pointer", textAlign: "left",
+        fontFamily: FONT_MONO, borderRadius: 3, display: "inline-flex", alignItems: "center", gap: 6,
       }}
     >
+      <span style={{ color: VIOLET }}>&#9656;</span>
       {text}
     </button>
   );
@@ -66,7 +67,7 @@ export default function DiagnosePanel() {
   const flatExamples = Object.values(examples).flat().slice(0, 6);
 
   return (
-    <div style={{ background: INK, borderTop: `1px solid ${LINE}` }}>
+    <div id="diagnose" style={{ background: INK, borderTop: `1px solid ${LINE}`, scrollMarginTop: 16 }}>
       <style>{`
         .think-dot {
           width: 5px; height: 5px; border-radius: 50%; background: ${VIOLET};
@@ -123,7 +124,15 @@ export default function DiagnosePanel() {
                   fontSize: 13, padding: "10px 12px", fontFamily: FONT_MONO, resize: "vertical",
                 }}
               />
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div
+                style={{
+                  fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase",
+                  color: MUTE, margin: "12px 0 8px",
+                }}
+              >
+                Click one to try it &darr;
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {flatExamples.map((ex) => (
                   <ExampleChip key={ex} text={ex} onClick={runDiagnosis} />
                 ))}
