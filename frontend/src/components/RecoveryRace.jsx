@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchSimulation, fetchFailureCodes } from "../api/client.js";
 import { inr } from "../lib/format.js";
+import { useAnimatedNumber } from "../lib/useAnimatedNumber.js";
 import {
   INK, PANEL, LINE, TEXT, MUTE, GOLD, STEEL, RUST, VIOLET, FONT_SANS, FONT_MONO,
 } from "../lib/theme.js";
@@ -52,6 +53,7 @@ function buildFailures(sim, labels) {
 }
 
 function Counter({ value, color, dim }) {
+  const animated = useAnimatedNumber(value, 550);
   return (
     <div
       style={{
@@ -65,7 +67,7 @@ function Counter({ value, color, dim }) {
         fontVariantNumeric: "tabular-nums",
       }}
     >
-      {inr(value)}
+      {inr(animated)}
     </div>
   );
 }
@@ -116,6 +118,8 @@ function EventRow({ ev, side }) {
 function Panel({ title, subtitle, recovered, rate, events, side, atRisk }) {
   const isAgent = side === "agent";
   const bar = atRisk > 0 ? (recovered / atRisk) * 100 : 0;
+  const animatedRate = useAnimatedNumber(rate, 550);
+  const accentColor = isAgent ? GOLD : STEEL;
 
   return (
     <div
@@ -146,17 +150,21 @@ function Panel({ title, subtitle, recovered, rate, events, side, atRisk }) {
             fontVariantNumeric: "tabular-nums", paddingTop: 18,
           }}
         >
-          {rate.toFixed(1)}%
+          {animatedRate.toFixed(1)}%
         </div>
       </div>
 
-      <Counter value={recovered} color={isAgent ? GOLD : STEEL} dim={!isAgent} />
+      <Counter value={recovered} color={accentColor} dim={!isAgent} />
 
-      <div className="mt-3 mb-5" style={{ height: 3, background: LINE, borderRadius: 0 }}>
+      <div
+        className="mt-3 mb-5"
+        style={{ height: 4, background: LINE, borderRadius: 0, position: "relative" }}
+      >
         <div
           style={{
-            height: "100%", width: bar + "%", background: isAgent ? GOLD : STEEL,
-            transition: "width 240ms linear",
+            height: "100%", width: Math.min(100, bar) + "%", background: accentColor,
+            transition: "width 600ms cubic-bezier(0.16, 1, 0.3, 1)",
+            boxShadow: isAgent ? `0 0 12px 0 ${accentColor}99, 0 0 2px 0 ${accentColor}` : "none",
           }}
         />
       </div>
@@ -273,6 +281,8 @@ export default function RecoveryRace() {
   }, [sim, failures, day, totalCharges]);
 
   const lift = baseTotal > 0 ? ((agentTotal - baseTotal) / baseTotal) * 100 : 0;
+  const animatedDelta = useAnimatedNumber(Math.max(0, agentTotal - baseTotal), 550);
+  const animatedLift = useAnimatedNumber(lift, 550);
 
   const handlePlayPause = () => {
     if (day >= horizon) {
@@ -306,33 +316,61 @@ export default function RecoveryRace() {
     <div style={{ background: INK, minHeight: "100vh", color: TEXT }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        .event-row { animation: slip 260ms ease-out; }
+
+        .event-row { animation: slip 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
         @keyframes slip {
-          from { opacity: 0; transform: translateY(6px); }
+          from { opacity: 0; transform: translateY(14px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .hero-up { animation: heroUp 750ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        @keyframes heroUp {
+          from { opacity: 0; transform: translateY(22px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @media (prefers-reduced-motion: reduce) {
-          .event-row { animation: none; }
+
+        .day-pulse { display: inline-block; animation: dayPulse 320ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        @keyframes dayPulse {
+          from { opacity: 0.35; transform: scale(1.18); }
+          to { opacity: 1; transform: scale(1); }
         }
+
+        .panel-in { animation: panelIn 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        @keyframes panelIn {
+          from { opacity: 0; transform: translateY(32px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .event-row, .hero-up, .day-pulse, .panel-in { animation: none !important; }
+        }
+
+        .ctl { transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease; }
+        .ctl:hover { transform: translateY(-1px); }
+        .ctl:active { transform: translateY(0); }
         .ctl:focus-visible { outline: 2px solid ${VIOLET}; outline-offset: 2px; }
       `}</style>
 
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <header className="px-5 sm:px-7 pt-8 pb-6" style={{ borderBottom: `1px solid ${LINE}` }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTE, marginBottom: 10 }}>
+          <div
+            className="hero-up"
+            style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTE, marginBottom: 10, animationDelay: "0ms" }}
+          >
             {totalCharges} failed charges &middot; {inr(atRisk)} at risk &middot; same
             dataset, both sides &middot; seed {sim.seed}
           </div>
           <h1
+            className="hero-up"
             style={{
               fontFamily: FONT_SANS, fontSize: "clamp(26px, 4.6vw, 40px)", fontWeight: 700,
-              letterSpacing: "-0.03em", lineHeight: 1.08, margin: 0,
+              letterSpacing: "-0.03em", lineHeight: 1.08, margin: 0, animationDelay: "80ms",
             }}
           >
             Watch a fixed retry schedule lose to a reasoning agent.
           </h1>
 
-          <div className="flex flex-wrap items-center gap-3 mt-6">
+          <div className="hero-up flex flex-wrap items-center gap-3 mt-6" style={{ animationDelay: "160ms" }}>
             <button
               className="ctl"
               onClick={handlePlayPause}
@@ -365,13 +403,13 @@ export default function RecoveryRace() {
               style={{ flex: 1, minWidth: 140, accentColor: VIOLET }}
               aria-label="Scrub simulation day"
             />
-            <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: MUTE, minWidth: 62, textAlign: "right" }}>
-              day {String(day).padStart(2, "0")}/{horizon}
+            <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: MUTE, minWidth: 68, textAlign: "right" }}>
+              day <span key={day} className="day-pulse">{String(day).padStart(2, "0")}</span>/{horizon}
             </span>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2" style={{ borderBottom: `1px solid ${LINE}` }}>
+        <div className="panel-in grid grid-cols-1 md:grid-cols-2" style={{ borderBottom: `1px solid ${LINE}` }}>
           <div style={{ borderRight: `1px solid ${LINE}` }}>
             <Panel
               side="baseline"
@@ -400,7 +438,7 @@ export default function RecoveryRace() {
               Extra revenue recovered
             </div>
             <div style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}>
-              {inr(Math.max(0, agentTotal - baseTotal))}
+              {inr(animatedDelta)}
             </div>
           </div>
           <div>
@@ -408,8 +446,8 @@ export default function RecoveryRace() {
               Lift over baseline
             </div>
             <div style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}>
-              {lift > 0 ? "+" : ""}
-              {lift.toFixed(0)}%
+              {animatedLift > 0 ? "+" : ""}
+              {animatedLift.toFixed(0)}%
             </div>
           </div>
           <p style={{ fontSize: 12, color: MUTE, lineHeight: 1.6, maxWidth: 380, margin: 0 }}>
