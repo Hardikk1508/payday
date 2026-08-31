@@ -51,3 +51,9 @@ export function fetchDiagnoseExamples() {
 export function fetchOutreachCopy({ chargeId, day, kind, customers = 5000, seed = 42 }) {
   return get("/outreach-copy", { charge_id: chargeId, day, kind, customers, seed });
 }
+
+export function fetchLedger({ limit = 20, kind } = {}) {
+  const params = { limit };
+  if (kind) params.kind = kind;
+  return get("/ledger", params);
+}

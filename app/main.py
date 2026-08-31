@@ -2,13 +2,14 @@
 
     uvicorn app.main:app --reload --port 8000
 
-    GET  /health            -- liveness, and whether the LLM is configured
+    GET  /health            -- liveness, and whether the LLM/DB are configured
     GET  /failure-codes     -- the taxonomy
     GET  /simulate          -- run both policies, return the comparison
     GET  /decisions         -- per-charge decision log with reasons
     POST /diagnose          -- classify a raw decline string (LLM, live)
     GET  /diagnose/examples -- sample decline strings for the demo UI
     GET  /outreach-copy     -- generate the customer-facing message for one action
+    GET  /ledger            -- recently persisted diagnose/outreach calls
 """
 
 from functools import lru_cache
@@ -19,6 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.data.failure_codes import FAILURE_CODES
+from app.db import ledger
+from app.db.mongo import is_configured as db_configured
 from app.llm.client import is_configured as llm_configured
 from app.llm.diagnose import SAMPLE_DECLINES, diagnose_decline
 from app.llm.outreach import generate_outreach_copy
@@ -43,7 +46,7 @@ def _cached_compare(customers: int, seed: int, outcome_seed: int) -> Dict[str, A
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"status": "ok", "llm_configured": llm_configured()}
+    return {"status": "ok", "llm_configured": llm_configured(), "db_configured": db_configured()}
 
 
 @app.get("/failure-codes")
@@ -130,10 +133,12 @@ def diagnose(payload: DiagnoseRequest) -> Dict[str, Any]:
     )
     recommended = agent_policy.plan(preview_charge, _PREVIEW_CUSTOMER)
 
-    return {
+    result = {
         "diagnosis": diagnosis.to_dict(),
         "recommended_plan": [a.to_dict() for a in recommended],
     }
+    ledger.record("diagnose", {"raw_text": payload.raw_text}, result)
+    return result
 
 
 @app.get("/diagnose/examples")
@@ -176,4 +181,23 @@ def outreach_copy(
         reason=attempt.reason,
         failure_label=FAILURE_CODES[result.failure_code].label,
     )
+    ledger.record(
+        "outreach_copy",
+        {"charge_id": charge_id, "day": day, "kind": kind, "customer_name": result.customer_name},
+        copy,
+    )
     return copy
+
+
+@app.get("/ledger")
+def ledger_recent(
+    limit: int = Query(20, ge=1, le=200),
+    kind: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """Recently persisted /diagnose and /outreach-copy calls -- proof the
+    decision ledger is a real, durable store and not just a per-request
+    audit trail. Empty list (not an error) when no MONGODB_URI is set."""
+    return {
+        "db_configured": db_configured(),
+        "entries": ledger.list_recent(limit=limit, kind=kind),
+    }

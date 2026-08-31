@@ -94,7 +94,7 @@ export default function DiagnosePanel() {
           .result-in, .plan-row, .think-dot { animation: none !important; }
         }
       `}</style>
-      <div style={{ maxWidth: 1180, margin: "0 auto" }} className="px-5 sm:px-7 py-10">
+      <div style={{ maxWidth: 1180, margin: "0 auto" }} className="px-5 sm:px-7 py-12 sm:py-14">
         <Reveal>
           <div style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTE, marginBottom: 10 }}>
             Live diagnosis &middot; POST /diagnose
@@ -102,7 +102,7 @@ export default function DiagnosePanel() {
           <h2 style={{ fontFamily: FONT_SANS, fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 700, color: TEXT, margin: "0 0 8px" }}>
             Classify a raw decline, right now
           </h2>
-          <p style={{ fontSize: 13, color: MUTE, maxWidth: 640, lineHeight: 1.6, margin: "0 0 20px" }}>
+          <p style={{ fontSize: 14, color: MUTE, maxWidth: 640, lineHeight: 1.7, margin: "0 0 22px" }}>
             Every charge in the race above already carries a clean failure code because the
             simulator wrote it. A real processor doesn't do that &mdash; it hands you a raw
             string. Paste one below (or pick an example) and this calls Groq to classify it

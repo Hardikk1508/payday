@@ -10,3 +10,13 @@ body,
   min-height: 100%;
   background: #0b0d12;
 }
+
+html {
+  scroll-padding-top: 52px; /* clears the sticky usage nav when jumping to a section */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}

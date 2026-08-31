@@ -166,7 +166,7 @@ export default function OutreachPanel() {
           .outreach-row, .copy-in, .think-dot { animation: none !important; }
         }
       `}</style>
-      <div style={{ maxWidth: 1180, margin: "0 auto" }} className="px-5 sm:px-7 py-10">
+      <div style={{ maxWidth: 1180, margin: "0 auto" }} className="px-5 sm:px-7 py-12 sm:py-14">
         <Reveal>
           <div style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTE, marginBottom: 10 }}>
             Live copy &middot; GET /outreach-copy
@@ -174,7 +174,7 @@ export default function OutreachPanel() {
           <h2 style={{ fontFamily: FONT_SANS, fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 700, color: TEXT, margin: "0 0 8px" }}>
             What Payday actually says to the customer
           </h2>
-          <p style={{ fontSize: 13, color: MUTE, maxWidth: 640, lineHeight: 1.6, margin: "0 0 20px" }}>
+          <p style={{ fontSize: 14, color: MUTE, maxWidth: 640, lineHeight: 1.7, margin: "0 0 22px" }}>
             The <code>reason</code> string on a logged decision is for the audit trail, not the
             inbox. These are real outreach and card-update actions from the cohort above
             (seed {SEED}) &mdash; generate the actual message Groq would send for each one.

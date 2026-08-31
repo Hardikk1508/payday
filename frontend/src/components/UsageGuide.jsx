@@ -1,4 +1,4 @@
-import { INK, LINE, TEXT, MUTE, GOLD, VIOLET, FONT_MONO } from "../lib/theme.js";
+import { INK, PANEL, LINE, TEXT, MUTE, GOLD, VIOLET, FONT_MONO, FONT_SANS } from "../lib/theme.js";
 
 const STEPS = [
   {
@@ -18,6 +18,12 @@ const STEPS = [
     text: "Click Generate message on any row",
     hint: "real Groq call",
     href: "#outreach",
+  },
+  {
+    n: "4",
+    text: "Watch it land in the ledger",
+    hint: "saved live",
+    href: "#ledger",
   },
 ];
 
@@ -61,17 +67,39 @@ function Step({ n, text, hint, href }) {
 
 export default function UsageGuide() {
   return (
-    <div style={{ background: INK, borderBottom: `1px solid ${LINE}` }}>
+    <div
+      style={{
+        background: PANEL, borderBottom: `1px solid ${LINE}`,
+        position: "sticky", top: 0, zIndex: 30,
+        boxShadow: "0 8px 24px -12px rgba(0,0,0,0.6)",
+      }}
+    >
       <style>{`
         .usage-link:hover span:nth-child(2) { color: ${VIOLET} !important; text-decoration: underline; }
       `}</style>
       <div
         style={{ maxWidth: 1180, margin: "0 auto" }}
-        className="px-5 sm:px-7 py-3 flex flex-wrap items-center gap-x-8 gap-y-1"
+        className="px-5 sm:px-7 py-3 flex flex-wrap items-center gap-x-2"
       >
-        {STEPS.map((s) => (
-          <Step key={s.n} {...s} />
-        ))}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          style={{
+            fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, color: TEXT,
+            textDecoration: "none", borderBottom: "none", marginRight: 20, flexShrink: 0,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Payday
+        </a>
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-1">
+          {STEPS.map((s) => (
+            <Step key={s.n} {...s} />
+          ))}
+        </div>
       </div>
     </div>
   );
