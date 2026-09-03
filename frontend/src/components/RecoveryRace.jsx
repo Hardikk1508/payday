@@ -5,6 +5,7 @@ import { useAnimatedNumber } from "../lib/useAnimatedNumber.js";
 import {
   INK, PANEL, LINE, TEXT, MUTE, GOLD, STEEL, RUST, VIOLET, FONT_SANS, FONT_MONO,
 } from "../lib/theme.js";
+import AmbientLedger from "./AmbientLedger.jsx";
 
 const CUSTOMERS = 5000;
 
@@ -125,7 +126,11 @@ function Panel({ title, subtitle, recovered, rate, events, side, atRisk }) {
     <div
       className="flex flex-col px-5 py-5 sm:px-7 sm:py-6"
       style={{
-        background: isAgent ? PANEL : "transparent",
+        // Baseline uses the section's own base color rather than literal
+        // transparency -- visually identical (it already sat on INK), but
+        // it now opaquely occludes AmbientLedger instead of letting it
+        // bleed through at full strength behind the baseline's data rows.
+        background: isAgent ? PANEL : INK,
         filter: isAgent ? "none" : "saturate(0.45)",
         minHeight: 420,
       }}
@@ -347,7 +352,8 @@ export default function RecoveryRace() {
   }
 
   return (
-    <div style={{ background: INK, minHeight: "100vh", color: TEXT }}>
+    <div style={{ background: INK, minHeight: "100vh", color: TEXT, position: "relative", overflow: "hidden" }}>
+      <AmbientLedger />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -415,7 +421,7 @@ export default function RecoveryRace() {
         .ctl:focus-visible { outline: 2px solid ${VIOLET}; outline-offset: 2px; }
       `}</style>
 
-      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative", zIndex: 1 }}>
         <header className="px-5 sm:px-7 pt-8 pb-6" style={{ borderBottom: `1px solid ${LINE}` }}>
           <div
             className="hero-up"
