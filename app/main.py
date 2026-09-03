@@ -10,6 +10,7 @@
     GET  /diagnose/examples -- sample decline strings for the demo UI
     GET  /outreach-copy     -- generate the customer-facing message for one action
     GET  /ledger            -- recently persisted diagnose/outreach calls
+    POST /send-outreach-email -- actually send a generated message via Resend
 """
 
 from functools import lru_cache
@@ -22,6 +23,7 @@ from pydantic import BaseModel
 from app.data.failure_codes import FAILURE_CODES
 from app.db import ledger
 from app.db.mongo import is_configured as db_configured
+from app.email.client import is_configured as email_configured, send_email
 from app.llm.client import is_configured as llm_configured
 from app.llm.diagnose import SAMPLE_DECLINES, diagnose_decline
 from app.llm.outreach import generate_outreach_copy
@@ -46,7 +48,12 @@ def _cached_compare(customers: int, seed: int, outcome_seed: int) -> Dict[str, A
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"status": "ok", "llm_configured": llm_configured(), "db_configured": db_configured()}
+    return {
+        "status": "ok",
+        "llm_configured": llm_configured(),
+        "db_configured": db_configured(),
+        "email_configured": email_configured(),
+    }
 
 
 @app.get("/failure-codes")
@@ -201,3 +208,33 @@ def ledger_recent(
         "db_configured": db_configured(),
         "entries": ledger.list_recent(limit=limit, kind=kind),
     }
+
+
+class SendEmailRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
+
+
+@app.post("/send-outreach-email")
+def send_outreach_email(payload: SendEmailRequest) -> Dict[str, Any]:
+    """Actually dispatch a generated outreach message via Resend.
+
+    Deliberately separate from /outreach-copy: generating the copy is safe
+    to do freely, sending it is a real, one-way action against a real
+    inbox, so it only happens on an explicit second click with a recipient
+    the caller typed in themselves -- never against the simulated cohort's
+    @example.com addresses, which cannot receive mail at all.
+    """
+    if not email_configured():
+        raise HTTPException(400, "RESEND_API_KEY not set -- add it to .env and restart the API")
+
+    result = send_email(to=payload.to, subject=payload.subject, body=payload.body)
+    ledger.record(
+        "email_sent",
+        {"to": payload.to, "subject": payload.subject},
+        result,
+    )
+    if not result["sent"]:
+        raise HTTPException(502, f"send failed: {result['error']}")
+    return result

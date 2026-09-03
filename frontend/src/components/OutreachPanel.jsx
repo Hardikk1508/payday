@@ -1,7 +1,25 @@
 import { useEffect, useState } from "react";
-import { fetchSimulation, fetchOutreachCopy } from "../api/client.js";
+import { fetchSimulation, fetchOutreachCopy, sendOutreachEmail } from "../api/client.js";
 import { INK, PANEL, LINE, TEXT, MUTE, GOLD, VIOLET, RUST, FONT_SANS, FONT_MONO } from "../lib/theme.js";
 import Reveal from "./Reveal.jsx";
+
+const LAST_EMAIL_KEY = "payday:lastSendEmail";
+
+function readLastEmail() {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeLastEmail(value) {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, value);
+  } catch {
+    // per-viewer convenience only -- fine if storage is unavailable
+  }
+}
 
 const SEED = 42;
 const CUSTOMERS = 5000;
@@ -52,6 +70,10 @@ function OutreachRow({ target, index }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [toEmail, setToEmail] = useState(readLastEmail);
+  const [sendStatus, setSendStatus] = useState("idle"); // idle | sending | sent | error
+  const [sendError, setSendError] = useState(null);
+
   const generate = async () => {
     setLoading(true);
     setError(null);
@@ -65,6 +87,20 @@ function OutreachRow({ target, index }) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const send = async () => {
+    if (!toEmail.trim() || !copy) return;
+    writeLastEmail(toEmail);
+    setSendStatus("sending");
+    setSendError(null);
+    try {
+      await sendOutreachEmail({ to: toEmail, subject: copy.subject, body: copy.body });
+      setSendStatus("sent");
+    } catch (err) {
+      setSendStatus("error");
+      setSendError(err.message);
     }
   };
 
@@ -122,7 +158,53 @@ function OutreachRow({ target, index }) {
               {copy.source === "llm" ? "groq" : "template"}
             </span>
           </div>
-          <p style={{ fontSize: 13, color: TEXT, lineHeight: 1.6, margin: 0 }}>{copy.body}</p>
+          <p style={{ fontSize: 13, color: TEXT, lineHeight: 1.6, margin: "0 0 12px" }}>{copy.body}</p>
+
+          <div
+            className="flex items-center gap-2 flex-wrap"
+            style={{ borderTop: `1px solid ${LINE}`, paddingTop: 10 }}
+          >
+            <input
+              type="email"
+              value={toEmail}
+              onChange={(e) => {
+                setToEmail(e.target.value);
+                if (sendStatus !== "idle") setSendStatus("idle");
+              }}
+              placeholder="real-address@you-control.com"
+              className="ctl"
+              style={{
+                background: INK, border: `1px solid ${LINE}`, color: TEXT,
+                fontSize: 12, padding: "6px 10px", fontFamily: FONT_MONO, flex: "1 1 220px", minWidth: 0,
+              }}
+            />
+            <button
+              className="ctl gen-btn"
+              onClick={send}
+              disabled={sendStatus === "sending" || !toEmail.trim()}
+              style={{
+                background: sendStatus === "sent" ? "transparent" : GOLD,
+                color: sendStatus === "sent" ? GOLD : INK,
+                border: `1px solid ${GOLD}`,
+                fontSize: 12, padding: "6px 14px", fontWeight: 500,
+                cursor: sendStatus === "sending" ? "default" : "pointer",
+                opacity: sendStatus === "sending" ? 0.7 : 1, flexShrink: 0,
+                display: "inline-flex", alignItems: "center", gap: 8,
+              }}
+            >
+              {sendStatus === "sending" && <>Sending <Thinking /></>}
+              {sendStatus === "sent" && "✓ Sent -- send again"}
+              {(sendStatus === "idle" || sendStatus === "error") && "Send email"}
+            </button>
+          </div>
+          {sendStatus === "error" && (
+            <div style={{ fontSize: 12, color: RUST, marginTop: 8 }}>{sendError}</div>
+          )}
+          {sendStatus === "sent" && (
+            <div style={{ fontSize: 12, color: GOLD, marginTop: 8 }}>
+              Delivered via Resend to {toEmail}.
+            </div>
+          )}
         </div>
       )}
     </div>

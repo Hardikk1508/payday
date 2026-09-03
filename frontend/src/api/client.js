@@ -17,7 +17,10 @@ async function post(path, body) {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText} on ${path}`);
+    // FastAPI's HTTPException body is {"detail": "..."} -- surface that
+    // exact reason (e.g. why a send failed) rather than just the status code.
+    const detail = await res.json().then((d) => d.detail).catch(() => null);
+    throw new Error(detail || `${res.status} ${res.statusText} on ${path}`);
   }
   return res.json();
 }
@@ -56,4 +59,8 @@ export function fetchLedger({ limit = 20, kind } = {}) {
   const params = { limit };
   if (kind) params.kind = kind;
   return get("/ledger", params);
+}
+
+export function sendOutreachEmail({ to, subject, body }) {
+  return post("/send-outreach-email", { to, subject, body });
 }
