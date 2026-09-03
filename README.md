@@ -112,6 +112,7 @@ action + reason  ---> outreach copy (LLM) ---> customer-facing message
 | Comparison | `app/simulator/compare.py` | Produces the headline number |
 | Diagnosis | `app/llm/diagnose.py` | Classifies a raw decline string via Groq, keyword heuristic if no key is set |
 | Outreach copy | `app/llm/outreach.py` | Generates the customer-facing message for an outreach/card-update action |
+| Ledger | `app/db/ledger.py`, `app/db/mongo.py` | Persists every live `/diagnose` and `/outreach-copy` call to MongoDB, read back by `GET /ledger` |
 
 **Why the diagnose/outreach LLM calls are kept out of the 5,000-customer
 loop:** that comparison has to stay deterministic -- same seed, same
@@ -121,9 +122,16 @@ charges). So `FailedCharge.failure_code` in the simulated cohort is known
 upfront, the way it would be *after* diagnosis. The `/diagnose` and
 `/outreach-copy` endpoints are the real, callable version of that step,
 exercised on demand against arbitrary input instead of baked into the bulk
-run. There's no persistent decision ledger or reweighting loop yet -- the
-`requirements.txt` entries for Mongo/Redis are staged for that, not wired
-up.
+run.
+
+**The ledger persists real usage, not the simulated cohort.** Every live
+call to `/diagnose` or `/outreach-copy` -- input, output, reasoning,
+timestamp -- is written to MongoDB and readable back via `GET /ledger`.
+Like the LLM layer, it degrades honestly: no `MONGODB_URI` configured, or
+Mongo unreachable, means that call just isn't logged, never a broken
+request. There's still no reweighting loop -- the ledger is a record of
+what happened, nothing yet reads it back to change how `agent_policy.py`
+decides. The `requirements.txt` entry for Redis is staged, not wired up.
 
 ## Running it
 
@@ -135,6 +143,8 @@ cp .env.example .env
 # fill in GROQ_API_KEY to get live LLM diagnosis/outreach copy; leave it
 # blank and both features fall back to a deterministic heuristic/template
 # instead of failing
+# fill in MONGODB_URI to persist those calls to a real decision ledger;
+# leave it blank and they still run live, just aren't saved
 
 # print the comparison
 python -m app.simulator.compare
@@ -159,13 +169,14 @@ npm run dev
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness, and whether an LLM key is configured |
+| GET | `/health` | Liveness, and whether the LLM/DB are configured |
 | GET | `/failure-codes` | The taxonomy and what each code means |
 | GET | `/simulate` | Full comparison, both policies |
 | GET | `/decisions` | Per-charge audit trail with reasons |
 | POST | `/diagnose` | Classify a raw decline string (live LLM call) |
 | GET | `/diagnose/examples` | Sample raw decline strings for the demo UI |
 | GET | `/outreach-copy` | Generate the customer-facing message for one logged action |
+| GET | `/ledger` | Recently persisted diagnose/outreach calls (empty if no `MONGODB_URI`) |
 
 ## Scope
 
