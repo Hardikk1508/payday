@@ -187,6 +187,21 @@ different problem with a different solution, and is out of scope here.
 ## Data
 
 All figures come from a seeded synthetic cohort, not from live payment data.
-The failure-code distribution and the recovery behaviour encoded in
-`outcome_model.py` follow publicly reported dunning patterns. Nothing here
-touches a real card or a real customer.
+Nothing here touches a real card or a real customer. Two different kinds of
+claim are mixed into `outcome_model.py`, worth telling apart:
+
+- **The mechanisms are real, reported patterns.** An expired card cannot
+  clear on retry. Insufficient-funds recovery correlates with proximity to
+  the customer's income date. Repeated retries on a "do not honor" decline
+  make the issuer warier, not more willing. 3DS/network failures are
+  recoverable only in a short window right after they happen. These
+  qualitative shapes are consistent with widely-cited dunning/involuntary-
+  churn writeups from payments and billing companies (Stripe, Recurly,
+  Chargebee, Baremetrics have all published versions of this).
+- **The exact numbers are estimates, not citations.** The specific
+  constants -- a 0.74 clear-probability on payday itself, a 0.72 per-day
+  decay on 3DS timeouts, a 0.05 hardening penalty per do-not-honor retry --
+  were calibrated by hand to produce a coherent, plausible simulation. No
+  single source backs the number "0.74" specifically. Treat the *lift*
+  Payday shows over baseline as an illustration of the mechanism, not a
+  guaranteed real-world percentage.
