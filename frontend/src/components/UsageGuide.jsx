@@ -19,12 +19,6 @@ const STEPS = [
     hint: "real Groq call",
     href: "#outreach",
   },
-  {
-    n: "4",
-    text: "Watch it land in the ledger",
-    hint: "saved live",
-    href: "#ledger",
-  },
 ];
 
 function Step({ n, text, hint, href }) {
