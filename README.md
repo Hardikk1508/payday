@@ -112,7 +112,8 @@ action + reason  ---> outreach copy (LLM) ---> customer-facing message
 | Comparison | `app/simulator/compare.py` | Produces the headline number |
 | Diagnosis | `app/llm/diagnose.py` | Classifies a raw decline string via Groq, keyword heuristic if no key is set |
 | Outreach copy | `app/llm/outreach.py` | Generates the customer-facing message for an outreach/card-update action |
-| Ledger | `app/db/ledger.py`, `app/db/mongo.py` | Persists every live `/diagnose` and `/outreach-copy` call to MongoDB, read back by `GET /ledger` |
+| Email delivery | `app/email/client.py` | Actually sends generated outreach copy via Resend, on an explicit second click |
+| Ledger | `app/db/ledger.py`, `app/db/mongo.py` | Persists every live `/diagnose`, `/outreach-copy` and send call to MongoDB, read back by `GET /ledger` |
 
 **Why the diagnose/outreach LLM calls are kept out of the 5,000-customer
 loop:** that comparison has to stay deterministic -- same seed, same
@@ -124,9 +125,17 @@ upfront, the way it would be *after* diagnosis. The `/diagnose` and
 exercised on demand against arbitrary input instead of baked into the bulk
 run.
 
+**Generating outreach copy and sending it are two separate steps.**
+`GET /outreach-copy` is free to call repeatedly. `POST /send-outreach-email`
+is a real, one-way action against a real inbox, so it only fires on an
+explicit second click against a recipient typed in by hand -- never against
+the simulated cohort's `@example.com` addresses, which are IANA-reserved
+and cannot receive mail regardless of how this is wired.
+
 **The ledger persists real usage, not the simulated cohort.** Every live
-call to `/diagnose` or `/outreach-copy` -- input, output, reasoning,
-timestamp -- is written to MongoDB and readable back via `GET /ledger`.
+call to `/diagnose`, `/outreach-copy`, or a send -- input, output,
+reasoning, timestamp -- is written to MongoDB and readable back via
+`GET /ledger`.
 Like the LLM layer, it degrades honestly: no `MONGODB_URI` configured, or
 Mongo unreachable, means that call just isn't logged, never a broken
 request. There's still no reweighting loop -- the ledger is a record of
@@ -145,6 +154,9 @@ cp .env.example .env
 # instead of failing
 # fill in MONGODB_URI to persist those calls to a real decision ledger;
 # leave it blank and they still run live, just aren't saved
+# fill in RESEND_API_KEY to actually send generated outreach copy to a
+# real address (POST /send-outreach-email); without a verified domain,
+# Resend restricts delivery to your own account's email
 
 # print the comparison
 python -m app.simulator.compare
@@ -169,14 +181,15 @@ npm run dev
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness, and whether the LLM/DB are configured |
+| GET | `/health` | Liveness, and whether the LLM/DB/email sender are configured |
 | GET | `/failure-codes` | The taxonomy and what each code means |
 | GET | `/simulate` | Full comparison, both policies |
 | GET | `/decisions` | Per-charge audit trail with reasons |
 | POST | `/diagnose` | Classify a raw decline string (live LLM call) |
 | GET | `/diagnose/examples` | Sample raw decline strings for the demo UI |
 | GET | `/outreach-copy` | Generate the customer-facing message for one logged action |
-| GET | `/ledger` | Recently persisted diagnose/outreach calls (empty if no `MONGODB_URI`) |
+| POST | `/send-outreach-email` | Actually send generated copy to a real address, via Resend |
+| GET | `/ledger` | Recently persisted diagnose/outreach/send calls (empty if no `MONGODB_URI`) |
 
 ## Scope
 
