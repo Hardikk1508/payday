@@ -256,10 +256,16 @@ export default function OutreachPanel() {
           <h2 style={{ fontFamily: FONT_SANS, fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 700, color: TEXT, margin: "0 0 8px" }}>
             What Payday actually says to the customer
           </h2>
-          <p style={{ fontSize: 14, color: MUTE, maxWidth: 640, lineHeight: 1.7, margin: "0 0 22px" }}>
+          <p style={{ fontSize: 14, color: MUTE, maxWidth: 640, lineHeight: 1.7, margin: "0 0 16px" }}>
             The <code>reason</code> string on a logged decision is for the audit trail, not the
             inbox. These are real outreach and card-update actions from the cohort above
             (seed {SEED}) &mdash; generate the actual message Groq would send for each one.
+          </p>
+          <p style={{ fontSize: 12, color: MUTE, maxWidth: 640, lineHeight: 1.6, margin: "0 0 22px", opacity: 0.85 }}>
+            Only two of the five failure families ever produce a message here &mdash;
+            <code>insufficient_funds</code> and <code>card_expired</code>. The other three
+            (<code>do_not_honor</code>, <code>auth_timeout</code>, <code>network_error</code>)
+            are pure-retry situations with nothing to say to the customer, by design.
           </p>
         </Reveal>
 
