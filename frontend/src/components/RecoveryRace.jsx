@@ -200,7 +200,10 @@ export default function RecoveryRace() {
   const [sim, setSim] = useState(null);
   const [labels, setLabels] = useState({});
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
   const timer = useRef(null);
+  const prevDay = useRef(0);
 
   useEffect(() => {
     fetchFailureCodes()
@@ -215,13 +218,31 @@ export default function RecoveryRace() {
   useEffect(() => {
     let cancelled = false;
     setError(null);
+    const requestStart = performance.now();
+    // Fetching a fresh 5,000-customer cohort on localhost often resolves in
+    // well under the 340ms cross-fade -- without a floor, the panels would
+    // barely dip before snapping back, and "New cohort" would look broken
+    // rather than transitioning. Pad short responses out to a minimum felt
+    // duration; never slow down a response that's already taking a while.
+    const MIN_VISIBLE_MS = 420;
 
     fetchSimulation({ customers: CUSTOMERS, seed })
       .then((res) => {
         if (cancelled) return;
-        setSim(res);
-        setDay(0);
-        setPlaying(true);
+        const elapsed = performance.now() - requestStart;
+        const settle = () => {
+          if (cancelled) return;
+          setSim(res);
+          setDay(0);
+          setPlaying(true);
+          setRefreshing(false);
+        };
+        const remaining = MIN_VISIBLE_MS - elapsed;
+        if (remaining > 0) {
+          setTimeout(settle, remaining);
+        } else {
+          settle();
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -248,6 +269,18 @@ export default function RecoveryRace() {
     timer.current = setTimeout(() => setDay((d) => d + 1), 260);
     return () => clearTimeout(timer.current);
   }, [playing, day, sim, horizon]);
+
+  // One-time flourish the moment the race crosses the finish line, not on
+  // every render while sitting at day 30 (e.g. after a manual scrub back).
+  useEffect(() => {
+    const wasBelow = prevDay.current < horizon;
+    prevDay.current = day;
+    if (wasBelow && day >= horizon && sim) {
+      setCelebrate(true);
+      const t = setTimeout(() => setCelebrate(false), 1300);
+      return () => clearTimeout(t);
+    }
+  }, [day, horizon, sim]);
 
   const { baseTotal, agentTotal, baseRate, agentRate, baseEvents, agentEvents } = useMemo(() => {
     if (!sim) {
@@ -296,6 +329,7 @@ export default function RecoveryRace() {
   const restart = () => {
     setPlaying(false);
     setDay(0);
+    setRefreshing(true);
     setSeed((s) => s + 1);
   };
 
@@ -341,8 +375,38 @@ export default function RecoveryRace() {
           to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Ambient pulse on the divider between the two panels -- a bit of
+           tension between the two sides, distinct from the data-driven
+           animations elsewhere on the page. */
+        .vs-divider { animation: dividerPulse 3400ms ease-in-out infinite; }
+        @keyframes dividerPulse {
+          0%, 100% { border-color: ${LINE}; }
+          50% { border-color: ${VIOLET}70; }
+        }
+
+        /* Cross-fade the panels out/in while a new cohort loads instead of
+           the data just snapping to new values mid-frame. */
+        .panels-refreshing { opacity: 0.18; filter: blur(2px); transform: scale(0.994); }
+        .panels-settled { opacity: 1; filter: blur(0); transform: scale(1); }
+        .panels-transition { transition: opacity 340ms ease, filter 340ms ease, transform 340ms ease; }
+
+        .finish-tag { animation: tagIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+        @keyframes tagIn {
+          from { opacity: 0; transform: scale(0.8) translateY(-4px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .stat-pop { animation: statPop 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+        @keyframes statPop {
+          0% { transform: scale(1); text-shadow: 0 0 0 transparent; }
+          30% { transform: scale(1.14); text-shadow: 0 0 26px ${GOLD}99; }
+          100% { transform: scale(1); text-shadow: 0 0 0 transparent; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .event-row, .hero-up, .day-pulse, .panel-in { animation: none !important; }
+          .event-row, .hero-up, .day-pulse, .panel-in, .vs-divider,
+          .finish-tag, .stat-pop { animation: none !important; }
+          .panels-transition { transition: none !important; }
         }
 
         .ctl { transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease; }
@@ -406,11 +470,25 @@ export default function RecoveryRace() {
             <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: MUTE, minWidth: 68, textAlign: "right" }}>
               day <span key={day} className="day-pulse">{String(day).padStart(2, "0")}</span>/{horizon}
             </span>
+            {day >= horizon && (
+              <span
+                className="finish-tag"
+                style={{
+                  fontFamily: FONT_MONO, fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase",
+                  color: GOLD, border: `1px solid ${GOLD}`, padding: "3px 9px", flexShrink: 0,
+                }}
+              >
+                race complete
+              </span>
+            )}
           </div>
         </header>
 
-        <div className="panel-in grid grid-cols-1 md:grid-cols-2" style={{ borderBottom: `1px solid ${LINE}` }}>
-          <div style={{ borderRight: `1px solid ${LINE}` }}>
+        <div
+          className={`panel-in panels-transition grid grid-cols-1 md:grid-cols-2 ${refreshing ? "panels-refreshing" : "panels-settled"}`}
+          style={{ borderBottom: `1px solid ${LINE}` }}
+        >
+          <div className="vs-divider" style={{ borderRight: `1px solid ${LINE}` }}>
             <Panel
               side="baseline"
               subtitle="Baseline"
@@ -437,7 +515,10 @@ export default function RecoveryRace() {
             <div style={{ fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: MUTE, marginBottom: 8 }}>
               Extra revenue recovered
             </div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}>
+            <div
+              className={celebrate ? "stat-pop" : ""}
+              style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}
+            >
               {inr(animatedDelta)}
             </div>
           </div>
@@ -445,7 +526,10 @@ export default function RecoveryRace() {
             <div style={{ fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: MUTE, marginBottom: 8 }}>
               Lift over baseline
             </div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}>
+            <div
+              className={celebrate ? "stat-pop" : ""}
+              style={{ fontFamily: FONT_MONO, fontSize: "clamp(26px, 4vw, 36px)", color: GOLD, fontVariantNumeric: "tabular-nums" }}
+            >
               {animatedLift > 0 ? "+" : ""}
               {animatedLift.toFixed(0)}%
             </div>
