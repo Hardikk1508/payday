@@ -355,8 +355,6 @@ export default function RecoveryRace() {
     <div style={{ background: INK, minHeight: "100vh", color: TEXT, position: "relative", overflow: "hidden" }}>
       <AmbientLedger />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
         .event-row { animation: slip 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
         @keyframes slip {
           from { opacity: 0; transform: translateY(14px) scale(0.985); }
